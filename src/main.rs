@@ -1,11 +1,13 @@
 use clap::{App, AppSettings, Arg, SubCommand};
 use std::path::Path;
 
+mod dockerignore;
 mod hasher;
 mod types;
+use dockerignore::*;
 use hasher::*;
 
-fn main() -> std::result::Result<(), anyhow::Error> {
+fn main() -> Result<(), anyhow::Error> {
     env_logger::init();
     let matches = App::new("Build Helper")
         .setting(AppSettings::SubcommandRequiredElseHelp)
@@ -25,11 +27,41 @@ fn main() -> std::result::Result<(), anyhow::Error> {
                         .takes_value(false),
                 ),
         )
+        .subcommand(
+            SubCommand::with_name("gen-dockerignore")
+                .about("Generate .dockerignore file")
+                .arg(
+                    Arg::with_name("directory")
+                        .short("d")
+                        .required(false)
+                        .default_value("."),
+                )
+                .arg(
+                    Arg::with_name("overwrite")
+                        .short("f")
+                        .required(false)
+                        .takes_value(false),
+                )
+                .arg(
+                    Arg::with_name("no-include-ignore")
+                        .short("n")
+                        .required(false)
+                        .takes_value(false),
+                )
+                .arg(Arg::with_name("component").required(true).index(1)),
+        )
         .get_matches();
     if let Some(m) = matches.subcommand_matches("hash-components") {
         let p: &Path = m.value_of_os("directory").unwrap().as_ref();
         let path = p.canonicalize()?;
         run_hasher(&path, m.is_present("pretty-print"))
+    } else if let Some(m) = matches.subcommand_matches("gen-dockerignore") {
+        let p: &Path = m.value_of_os("directory").unwrap().as_ref();
+        let path = p.canonicalize()?;
+        let d = m.value_of("component").unwrap();
+        let overwrite = m.is_present("overwrite");
+        let noinclude = m.is_present("no-include-ignore");
+        run_dockerignore_creator(&path, d, overwrite, noinclude)
     } else {
         panic!("unexpected subcommand")
     }
