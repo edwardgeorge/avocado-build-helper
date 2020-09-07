@@ -1,10 +1,9 @@
 use anyhow::{anyhow, Result};
 use clap::{App, Arg};
-use serde::{Deserialize, Serialize};
-use serde_json::{from_reader, Value};
+use serde_json::{from_reader};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::fs::{File};
 use std::hash::Hash;
@@ -14,27 +13,8 @@ use std::process::Command;
 use std::str::from_utf8;
 use std::vec::Vec;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Component {
-    dir: String,
-    #[serde(skip_serializing_if = "Vec::is_empty", default = "Vec::new")]
-    dependencies: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    commit_sha: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tree_sha: Option<String>,
-    #[serde(flatten)]
-    rem: Value,
-}
-
-impl Component {
-    fn depset(&self) -> HashSet<String> {
-        self.dependencies.iter().map(|v| v.to_owned()).collect()
-    }
-    fn depsorted(&self) -> Vec<String> {
-        self.dependencies.iter().map(|a| a.to_owned()).collect::<BinaryHeap<_>>().into_sorted_vec()
-    }
-}
+mod types;
+use types::*;
 
 fn hash_for_dir(git_dir: &Path, path: &Path) -> Result<String> {
     let out = Command::new("git")
