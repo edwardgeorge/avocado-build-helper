@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{Value};
+use serde_json::Value;
 use std::collections::{BinaryHeap, HashSet};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,6 +20,10 @@ impl Component {
         self.dependencies.iter().map(|v| v.to_owned()).collect()
     }
     pub fn depsorted(&self) -> Vec<String> {
-        self.dependencies.iter().map(|a| a.to_owned()).collect::<BinaryHeap<_>>().into_sorted_vec()
+        self.dependencies
+            .iter()
+            .map(|a| a.to_owned())
+            .collect::<BinaryHeap<_>>()
+            .into_sorted_vec()
     }
 }
