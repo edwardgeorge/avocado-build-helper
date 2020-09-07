@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_reader, Value};
 use std::collections::{BinaryHeap, HashSet};
 use std::fs::File;
+use std::hash::Hash;
 use std::path::Path;
 use std::vec::Vec;
 
@@ -34,4 +35,48 @@ impl Component {
 pub fn load_components(path: &Path) -> Vec<Component> {
     let f = File::open(path.join("components.json")).unwrap();
     from_reader(f).unwrap()
+}
+
+pub fn toposort<A, K, F, G>(inp: Vec<A>, key: F, fdep: G) -> Vec<A>
+where
+    K: Eq + Hash + std::fmt::Debug,
+    F: Fn(&A) -> K,
+    G: Fn(&A) -> HashSet<K>,
+{
+    // very simple topological sort (_not_ tarjan)
+    // keeps popping items out of a vec in passes until it makes a whole pass without
+    // popping any off, in this case where we cannot make progress we must
+    // have a loop somewhere.
+    let mut inp = inp;
+    let mut res = Vec::new();
+    let mut seen: HashSet<K> = HashSet::new();
+    let mut rem: Vec<_> = inp
+        .drain(..)
+        .map(|a| {
+            let k = key(&a);
+            let deps = fdep(&a);
+            (a, k, deps)
+        })
+        .collect();
+    let mut non = Vec::new();
+    loop {
+        if rem.is_empty() {
+            return res;
+        }
+        let mut active = false;
+        for (v, k, deps) in rem.drain(..) {
+            if deps.is_subset(&seen) {
+                res.push(v);
+                seen.insert(k);
+                active = true;
+            } else {
+                non.push((v, k, deps));
+            }
+        }
+        if !active {
+            let keys: Vec<_> = non.iter().map(|(_, k, _)| k).collect();
+            panic!("Cycle found in deps! participants: {:?}", keys);
+        }
+        std::mem::swap(&mut rem, &mut non);
+    }
 }

@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use std::convert::TryInto;
 use std::hash::Hash;
 use std::io::{stdout, Write};
@@ -63,50 +63,6 @@ fn hash_for_dir(git_dir: &Path, path: &Path) -> Result<String> {
             )),
             None => Err(anyhow!("git command exited with signal")),
         }
-    }
-}
-
-fn toposort<A, K, F, G>(inp: Vec<A>, key: F, fdep: G) -> Vec<A>
-where
-    K: Eq + Hash + std::fmt::Debug,
-    F: Fn(&A) -> K,
-    G: Fn(&A) -> HashSet<K>,
-{
-    // very simple topological sort (_not_ tarjan)
-    // keeps popping items out of a vec in passes until it makes a whole pass without
-    // popping any off, in this case where we cannot make progress we must
-    // have a loop somewhere.
-    let mut inp = inp;
-    let mut res = Vec::new();
-    let mut seen: HashSet<K> = HashSet::new();
-    let mut rem: Vec<_> = inp
-        .drain(..)
-        .map(|a| {
-            let k = key(&a);
-            let deps = fdep(&a);
-            (a, k, deps)
-        })
-        .collect();
-    let mut non = Vec::new();
-    loop {
-        if rem.is_empty() {
-            return res;
-        }
-        let mut active = false;
-        for (v, k, deps) in rem.drain(..) {
-            if deps.is_subset(&seen) {
-                res.push(v);
-                seen.insert(k);
-                active = true;
-            } else {
-                non.push((v, k, deps));
-            }
-        }
-        if !active {
-            let keys: Vec<_> = non.iter().map(|(_, k, _)| k).collect();
-            panic!("Cycle found in deps! participants: {:?}", keys);
-        }
-        std::mem::swap(&mut rem, &mut non);
     }
 }
 
