@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{from_reader, Value};
 use std::collections::{BinaryHeap, HashSet};
+use std::fs::File;
+use std::path::Path;
+use std::vec::Vec;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Component {
@@ -26,4 +29,9 @@ impl Component {
             .collect::<BinaryHeap<_>>()
             .into_sorted_vec()
     }
+}
+
+pub fn load_components(path: &Path) -> Vec<Component> {
+    let f = File::open(path.join("components.json")).unwrap();
+    from_reader(f).unwrap()
 }

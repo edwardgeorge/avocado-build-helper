@@ -1,10 +1,8 @@
 use anyhow::{anyhow, Result};
-use serde_json::from_reader;
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
-use std::fs::File;
 use std::hash::Hash;
 use std::io::{stdout, Write};
 use std::path::Path;
@@ -14,8 +12,7 @@ use std::str::from_utf8;
 use crate::types::*;
 
 pub fn run_hasher(path: &Path, pretty_print: bool) -> Result<(), anyhow::Error> {
-    let f = File::open(path.join("components.json")).unwrap();
-    let mut x: Vec<Component> = from_reader(f).unwrap();
+    let mut x = load_components(path);
     x = toposort(x, |a| a.dir.to_owned(), |a| a.depset());
     let mut n: HashMap<String, (i32, [u8; 32])> = HashMap::new();
     let x: Vec<_> = x
