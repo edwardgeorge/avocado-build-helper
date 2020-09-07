@@ -37,7 +37,11 @@ pub fn load_components(path: &Path) -> Vec<Component> {
     from_reader(f).unwrap()
 }
 
-pub fn toposort<A, K, F, G>(inp: Vec<A>, key: F, fdep: G) -> Vec<A>
+pub fn toposort_components(inp: Vec<Component>) -> Vec<Component> {
+    toposort(inp, |a| a.dir.to_owned(), |a| a.depset())
+}
+
+fn toposort<A, K, F, G>(inp: Vec<A>, key: F, fdep: G) -> Vec<A>
 where
     K: Eq + Hash + std::fmt::Debug,
     F: Fn(&A) -> K,

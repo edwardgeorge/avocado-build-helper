@@ -13,7 +13,7 @@ use crate::types::*;
 
 pub fn run_hasher(path: &Path, pretty_print: bool) -> Result<(), anyhow::Error> {
     let mut x = load_components(path);
-    x = toposort(x, |a| a.dir.to_owned(), |a| a.depset());
+    x = toposort_components(x);
     let mut n: HashMap<String, (i32, [u8; 32])> = HashMap::new();
     let x: Vec<_> = x
         .iter_mut()
