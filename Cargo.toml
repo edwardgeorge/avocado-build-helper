@@ -1,5 +1,5 @@
 [package]
-name = "md-build-helper"
+name = "avocado-build-helper"
 version = "0.1.0"
 authors = ["Edward George <edward.george@maersk.com>"]
 edition = "2018"
@@ -7,5 +7,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.32"
+clap = "2.33.3"
+env_logger = "0.7.1"
+hex = "0.4.2"
+log = "0.4.11"
 serde = { version = "1.0.115", features = ["derive"] }
 serde_json = "1.0.57"
+sha2 = "0.9.1"
