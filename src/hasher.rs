@@ -11,7 +11,7 @@ use std::str::from_utf8;
 
 use crate::types::*;
 
-pub fn run_hasher(path: &Path, pretty_print: bool) -> Result<(), anyhow::Error> {
+pub fn run_hasher(path: &Path, pretty_print: bool, remove_dependencies: bool) -> Result<(), anyhow::Error> {
     let mut x = load_components(path);
     x = toposort_components(x);
     let mut n: HashMap<String, (i32, [u8; 32])> = HashMap::new();
@@ -28,6 +28,9 @@ pub fn run_hasher(path: &Path, pretty_print: bool) -> Result<(), anyhow::Error> 
             n.insert(comp.dir.to_owned(), res);
             comp.commit_sha = Some(commit_hash);
             comp.tree_sha = Some(hex::encode(res.1));
+            if remove_dependencies {
+                comp.dependencies = Vec::new();
+            }
             comp
         })
         .collect();

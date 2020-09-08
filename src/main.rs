@@ -25,6 +25,11 @@ fn main() -> Result<(), anyhow::Error> {
                         .short("-p")
                         .required(false)
                         .takes_value(false),
+                ).arg(
+                    Arg::with_name("remove-dependencies")
+                        .short("-r")
+                        .required(false)
+                        .takes_value(false)
                 ),
         )
         .subcommand(
@@ -54,7 +59,7 @@ fn main() -> Result<(), anyhow::Error> {
     if let Some(m) = matches.subcommand_matches("hash-components") {
         let p: &Path = m.value_of_os("directory").unwrap().as_ref();
         let path = p.canonicalize()?;
-        run_hasher(&path, m.is_present("pretty-print"))
+        run_hasher(&path, m.is_present("pretty-print"), m.is_present("remove-dependencies"))
     } else if let Some(m) = matches.subcommand_matches("gen-dockerignore") {
         let p: &Path = m.value_of_os("directory").unwrap().as_ref();
         let path = p.canonicalize()?;
