@@ -17,17 +17,18 @@ pub fn run_dockerignore_creator(
     path: &Path,
     dir: &str,
     write_to_file: bool,
-    no_include: bool,
+    no_include_ignore: bool,
 ) -> Result<(), anyhow::Error> {
     let dockerignore_path = path.join(".dockerignore");
-    let x = load_components(path);
+    let x = transitive_dependencies(load_components(path), dir.to_owned(), true);
     let component =
         find_component_by_dir(x, dir).expect(&format!("Dir '{}' not found in components", dir));
-    let contents = if !no_include && dockerignore_path.exists() && dockerignore_path.is_file() {
-        Some(read_to_string(&dockerignore_path)?)
-    } else {
-        None
-    };
+    let contents =
+        if !no_include_ignore && dockerignore_path.exists() && dockerignore_path.is_file() {
+            Some(read_to_string(&dockerignore_path)?)
+        } else {
+            None
+        };
     let mut output: Box<dyn Write> = if write_to_file {
         Box::new(
             std::fs::OpenOptions::new()

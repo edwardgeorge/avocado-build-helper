@@ -41,6 +41,44 @@ pub fn toposort_components(inp: Vec<Component>) -> Vec<Component> {
     toposort(inp, |a| a.dir.to_owned(), |a| a.depset())
 }
 
+pub fn transitive_dependencies(
+    inp: Vec<Component>,
+    dir: String,
+    include_self: bool,
+) -> Vec<Component> {
+    let mut deps = toposort_components(inp);
+    deps.reverse();
+    let mut needed: HashSet<String> = HashSet::new();
+    let mut result = Vec::<Component>::new();
+    needed.insert(dir.clone());
+    for item in deps.drain(..) {
+        log::debug!(
+            "Searching for transitive deps at '{}', needed: {:?}",
+            item.dir,
+            needed
+        );
+        if needed.contains(&item.dir) {
+            needed.remove(&item.dir);
+            let is_self = &item.dir == &dir;
+            needed.extend(item.depset());
+            if !is_self || include_self {
+                result.push(item);
+            }
+        }
+        if needed.is_empty() {
+            // no more dependencies needed; short-circuit
+            return result;
+        }
+    }
+    if !needed.is_empty() {
+        panic!(
+            "Not all transitive dependencies in components: {:?} missing",
+            needed
+        );
+    }
+    result
+}
+
 fn toposort<A, K, F, G>(inp: Vec<A>, key: F, fdep: G) -> Vec<A>
 where
     K: Eq + Hash + std::fmt::Debug,
