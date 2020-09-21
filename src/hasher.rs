@@ -23,7 +23,7 @@ where
     let mut x = load_components(path);
     x = toposort_components(x);
     let mut n: HashMap<String, (i32, [u8; 32])> = HashMap::new();
-    let x: Vec<_> = x
+    let x: Result<Vec<_>> = x
         .iter_mut()
         .map(|comp| {
             log::debug!(
@@ -39,14 +39,15 @@ where
             if remove_dependencies {
                 comp.dependencies = Vec::new();
             }
-            post_process(comp);
-            comp
+            post_process(comp)?;
+            Ok(comp)
         })
         .collect();
+    let y = x?;
     let json = if pretty_print {
-        serde_json::to_string_pretty(&x)?
+        serde_json::to_string_pretty(&y)?
     } else {
-        serde_json::to_string(&x)?
+        serde_json::to_string(&y)?
     };
     stdout().write_all(json.as_ref())?;
     Ok(())
