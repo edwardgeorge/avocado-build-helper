@@ -2,9 +2,11 @@ use clap::{App, AppSettings, Arg, SubCommand};
 use std::path::Path;
 
 mod dockerignore;
+mod executor;
 mod hasher;
 mod types;
 use dockerignore::*;
+use executor::{annotate_component, CommandRegistry};
 use hasher::*;
 
 fn main() -> Result<(), anyhow::Error> {
@@ -25,11 +27,20 @@ fn main() -> Result<(), anyhow::Error> {
                         .short("-p")
                         .required(false)
                         .takes_value(false),
-                ).arg(
+                )
+                .arg(
                     Arg::with_name("remove-dependencies")
                         .short("-r")
                         .required(false)
-                        .takes_value(false)
+                        .takes_value(false),
+                )
+                .arg(
+                    Arg::with_name("add-exec-prop")
+                        .long("add-exec-prop")
+                        .required(false)
+                        .takes_value(true)
+                        .multiple(true)
+                        .number_of_values(1),
                 ),
         )
         .subcommand(
@@ -57,9 +68,26 @@ fn main() -> Result<(), anyhow::Error> {
         )
         .get_matches();
     if let Some(m) = matches.subcommand_matches("hash-components") {
+        let mut reg = CommandRegistry::new();
         let p: &Path = m.value_of_os("directory").unwrap().as_ref();
         let path = p.canonicalize()?;
-        run_hasher(&path, m.is_present("pretty-print"), m.is_present("remove-dependencies"))
+        if let Some(cmds) = m.values_of("add-exec-prop") {
+            for cmd in cmds {
+                if let Some(p) = cmd.find('=') {
+                    let x = &cmd[..p];
+                    let y = &cmd[p + 1..];
+                    reg.add_command(x, y)?;
+                } else {
+                    panic!("Invalid argument format {:?}, requires an '='", cmd);
+                }
+            }
+        }
+        run_hasher(
+            &path,
+            m.is_present("pretty-print"),
+            m.is_present("remove-dependencies"),
+            |mut c| annotate_component(&reg, &mut c),
+        )
     } else if let Some(m) = matches.subcommand_matches("gen-dockerignore") {
         let p: &Path = m.value_of_os("directory").unwrap().as_ref();
         let path = p.canonicalize()?;

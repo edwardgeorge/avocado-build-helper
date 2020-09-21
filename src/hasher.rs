@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use sha2::{Digest, Sha256};
 use std::borrow::Borrow;
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::hash::Hash;
 use std::io::{stdout, Write};
@@ -11,7 +11,15 @@ use std::str::from_utf8;
 
 use crate::types::*;
 
-pub fn run_hasher(path: &Path, pretty_print: bool, remove_dependencies: bool) -> Result<(), anyhow::Error> {
+pub fn run_hasher<F>(
+    path: &Path,
+    pretty_print: bool,
+    remove_dependencies: bool,
+    post_process: F,
+) -> Result<(), anyhow::Error>
+where
+    F: Fn(&mut Component) -> anyhow::Result<()>,
+{
     let mut x = load_components(path);
     x = toposort_components(x);
     let mut n: HashMap<String, (i32, [u8; 32])> = HashMap::new();
@@ -31,6 +39,7 @@ pub fn run_hasher(path: &Path, pretty_print: bool, remove_dependencies: bool) ->
             if remove_dependencies {
                 comp.dependencies = Vec::new();
             }
+            post_process(comp);
             comp
         })
         .collect();
