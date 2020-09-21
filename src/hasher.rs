@@ -15,6 +15,7 @@ pub fn run_hasher<F>(
     path: &Path,
     pretty_print: bool,
     remove_dependencies: bool,
+    include_short_shas: bool,
     post_process: F,
 ) -> Result<(), anyhow::Error>
 where
@@ -35,9 +36,11 @@ where
             let res = hash_for_node(&commit_hash, &comp.depsorted(), &n);
             n.insert(comp.dir.to_owned(), res);
             let tree_hex = hex::encode(res.1);
-            comp.commit_sha_short = Some(commit_hash[..8].to_owned());
+            if include_short_shas {
+                comp.commit_sha_short = Some(commit_hash[..8].to_owned());
+                comp.tree_sha_short = Some(tree_hex[..16].to_owned());
+            }
             comp.commit_sha = Some(commit_hash);
-            comp.tree_sha_short = Some(tree_hex[..16].to_owned());
             comp.tree_sha = Some(tree_hex);
             if remove_dependencies {
                 comp.dependencies = Vec::new();

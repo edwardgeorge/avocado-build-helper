@@ -29,6 +29,13 @@ fn main() -> Result<(), anyhow::Error> {
                         .takes_value(false),
                 )
                 .arg(
+                    Arg::with_name("short-shas")
+                        .long("short")
+                        .short("-s")
+                        .required(false)
+                        .takes_value(false),
+                )
+                .arg(
                     Arg::with_name("remove-dependencies")
                         .short("-r")
                         .required(false)
@@ -71,6 +78,7 @@ fn main() -> Result<(), anyhow::Error> {
         let mut reg = CommandRegistry::new();
         let p: &Path = m.value_of_os("directory").unwrap().as_ref();
         let path = p.canonicalize()?;
+        let short = m.is_present("short-shas");
         if let Some(cmds) = m.values_of("add-exec-prop") {
             for cmd in cmds {
                 if let Some(p) = cmd.find('=') {
@@ -86,6 +94,7 @@ fn main() -> Result<(), anyhow::Error> {
             &path,
             m.is_present("pretty-print"),
             m.is_present("remove-dependencies"),
+            short,
             |mut c| annotate_component(&reg, &mut c),
         )
     } else if let Some(m) = matches.subcommand_matches("gen-dockerignore") {
