@@ -14,7 +14,11 @@ pub struct Component {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commit_sha: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub commit_sha_short: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tree_sha: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tree_sha_short: Option<String>,
     #[serde(flatten)]
     pub rem: Value,
 }
