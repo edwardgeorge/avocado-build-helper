@@ -89,7 +89,7 @@ where
     F: Fn(&A) -> K,
     G: Fn(&A) -> HashSet<K>,
 {
-    // very simple topological sort (_not_ tarjan)
+    // very simple (warning: n^2) topological sort (_not_ tarjan)
     // keeps popping items out of a vec in passes until it makes a whole pass without
     // popping any off, in this case where we cannot make progress we must
     // have a loop somewhere.
