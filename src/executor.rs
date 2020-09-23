@@ -1,7 +1,7 @@
 use handlebars::Handlebars;
 use serde_json::Value;
 use shell_words::split;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::vec::Vec;
 
 use crate::types::Component;
@@ -28,7 +28,10 @@ impl<'a> CommandRegistry<'a> {
     pub fn run_command(&self, name: &str, data: &Component) -> anyhow::Result<String> {
         let cmd = self.handlebars.render(name, data)?;
         let args = split(&cmd)?;
-        let out = Command::new(&args[0]).args(&args[1..]).output()?;
+        let out = Command::new(&args[0])
+            .args(&args[1..])
+            .stderr(Stdio::inherit())
+            .output()?;
         if !out.status.success() {
             panic!(
                 "Command {:?} was not successful: {:?}",
