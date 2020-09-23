@@ -45,10 +45,6 @@ impl<'a> CommandRegistry<'a> {
             .map(|c| self.run_command(c, data).map(|v| (c.clone(), v)))
             .collect()
     }
-
-    pub fn commands(&self) -> &[String] {
-        &self.commands[..]
-    }
 }
 
 pub fn annotate_component(reg: &CommandRegistry, component: &mut Component) -> anyhow::Result<()> {
