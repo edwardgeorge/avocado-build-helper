@@ -1,4 +1,5 @@
 use handlebars::Handlebars;
+use regex::Regex;
 use serde_json::Value;
 use shell_words::split;
 use std::process::{Command, Stdio};
@@ -30,6 +31,7 @@ impl<'a> CommandRegistry<'a> {
         let args = split(&cmd)?;
         let out = Command::new(&args[0])
             .args(&args[1..])
+            .envs(component_to_envs("AVOCADO_", data)?)
             .stderr(Stdio::inherit())
             .output()?;
         if !out.status.success() {
@@ -57,4 +59,20 @@ pub fn annotate_component(reg: &CommandRegistry, component: &mut Component) -> a
         m.insert(k, Value::from(v));
     }
     Ok(())
+}
+
+fn component_to_envs(prefix: &str, component: &Component) -> anyhow::Result<Vec<(String, String)>> {
+    let v = serde_json::to_value(component)?;
+    let x = v
+        .as_object()
+        .unwrap()
+        .iter()
+        .filter_map(|(k, v)| v.as_str().map(|s| (key_to_env_var(k, prefix), s.to_owned())))
+        .collect();
+    Ok(x)
+}
+
+fn key_to_env_var(key: &str, prefix: &str) -> String {
+    let regex = Regex::new(r"[^a-zA-Z0-9_]+").unwrap();
+    [prefix, &regex.replace_all(key, "_")].concat().to_uppercase()
 }

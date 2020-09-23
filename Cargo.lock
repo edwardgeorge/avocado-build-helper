@@ -45,6 +45,7 @@ dependencies = [
  "handlebars",
  "hex",
  "log",
+ "regex",
  "serde",
  "serde_json",
  "sha2",
