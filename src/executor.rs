@@ -15,9 +15,15 @@ pub struct DuplicatePropertyNameError {
     name: String,
 }
 
+#[derive(Debug)]
+struct CommandConfig {
+    is_shell: bool,
+    is_bool: bool,
+}
+
 pub struct CommandRegistry<'a> {
     commands: Vec<String>,
-    is_shell_map: HashMap<String, bool>,
+    is_shell_map: HashMap<String, CommandConfig>,
     handlebars: Handlebars<'a>,
 }
 
@@ -49,6 +55,7 @@ impl<'a> CommandRegistry<'a> {
         name: &str,
         command: &str,
         is_shell_command: bool,
+        is_bool_result: bool,
     ) -> anyhow::Result<()> {
         if self.is_shell_map.contains_key(name) {
             anyhow::bail!(DuplicatePropertyNameError {
@@ -56,7 +63,11 @@ impl<'a> CommandRegistry<'a> {
             });
         }
         self.commands.push(name.to_owned());
-        self.is_shell_map.insert(name.to_owned(), is_shell_command);
+        let config = CommandConfig {
+            is_shell: is_shell_command,
+            is_bool: is_bool_result,
+        };
+        self.is_shell_map.insert(name.to_owned(), config);
         Ok(self.handlebars.register_template_string(name, command)?)
     }
 
@@ -65,6 +76,7 @@ impl<'a> CommandRegistry<'a> {
         name: &str,
         data: &Component,
         is_shell_command: bool,
+        is_bool_result: bool,
     ) -> anyhow::Result<String> {
         let cmd = self.handlebars.render(name, data)?;
         let mut com = if is_shell_command {
@@ -76,6 +88,13 @@ impl<'a> CommandRegistry<'a> {
             .envs(component_to_envs("AVOCADO_", data)?)
             .stderr(Stdio::inherit())
             .output()?;
+        if is_bool_result {
+            return Ok(match out.status.success() {
+                true => "true",
+                false => "false",
+            }
+            .to_owned());
+        }
         if !out.status.success() {
             panic!(
                 "Command {:?} was not successful: {:?}",
@@ -90,7 +109,8 @@ impl<'a> CommandRegistry<'a> {
         self.commands
             .iter()
             .map(|c| {
-                self.run_command(c, data, *self.is_shell_map.get(c).unwrap())
+                let config = self.is_shell_map.get(c).unwrap();
+                self.run_command(c, data, config.is_shell, config.is_bool)
                     .map(|v| (c.clone(), v))
             })
             .collect()

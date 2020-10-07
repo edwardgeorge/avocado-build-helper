@@ -119,9 +119,15 @@ fn register_added_props<'a, A: Iterator<Item = &'a str>>(
 ) -> anyhow::Result<()> {
     for cmd in props {
         if let Some(p) = cmd.find('=') {
-            let x = &cmd[..p];
+            let mut x = &cmd[..p];
+            let is_bool = if x.ends_with("?") {
+                x = &x[..p - 1];
+                true
+            } else {
+                false
+            };
             let y = &cmd[p + 1..];
-            reg.add_command(x, y, is_shell)?;
+            reg.add_command(x, y, is_shell, is_bool)?;
         } else {
             panic!("Invalid argument format {:?}, requires an '='", cmd);
         }
