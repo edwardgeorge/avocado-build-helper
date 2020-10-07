@@ -48,6 +48,14 @@ fn main() -> Result<(), anyhow::Error> {
                         .takes_value(true)
                         .multiple(true)
                         .number_of_values(1),
+                )
+                .arg(
+                    Arg::with_name("add-sh-prop")
+                        .long("add-sh-prop")
+                        .required(false)
+                        .takes_value(true)
+                        .multiple(true)
+                        .number_of_values(1),
                 ),
         )
         .subcommand(
@@ -80,15 +88,10 @@ fn main() -> Result<(), anyhow::Error> {
         let path = p.canonicalize()?;
         let short = m.is_present("short-shas");
         if let Some(cmds) = m.values_of("add-exec-prop") {
-            for cmd in cmds {
-                if let Some(p) = cmd.find('=') {
-                    let x = &cmd[..p];
-                    let y = &cmd[p + 1..];
-                    reg.add_command(x, y)?;
-                } else {
-                    panic!("Invalid argument format {:?}, requires an '='", cmd);
-                }
-            }
+            register_added_props(&mut reg, cmds, false)?;
+        }
+        if let Some(cmds) = m.values_of("add-sh-prop") {
+            register_added_props(&mut reg, cmds, true)?;
         }
         run_hasher(
             &path,
@@ -107,4 +110,21 @@ fn main() -> Result<(), anyhow::Error> {
     } else {
         panic!("unexpected subcommand")
     }
+}
+
+fn register_added_props<'a, A: Iterator<Item = &'a str>>(
+    reg: &mut CommandRegistry,
+    props: A,
+    is_shell: bool,
+) -> anyhow::Result<()> {
+    for cmd in props {
+        if let Some(p) = cmd.find('=') {
+            let x = &cmd[..p];
+            let y = &cmd[p + 1..];
+            reg.add_command(x, y, is_shell)?;
+        } else {
+            panic!("Invalid argument format {:?}, requires an '='", cmd);
+        }
+    }
+    Ok(())
 }
