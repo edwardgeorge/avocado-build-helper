@@ -112,12 +112,13 @@ fn main() -> Result<(), anyhow::Error> {
     }
 }
 
-fn register_added_props<'a, A: Iterator<Item = &'a str>>(
+fn register_added_props<'a, A: Iterator<Item = T>, T: AsRef<str>>(
     reg: &mut CommandRegistry,
     props: A,
     is_shell: bool,
 ) -> anyhow::Result<()> {
-    for cmd in props {
+    for cmd_ref in props {
+        let cmd = cmd_ref.as_ref();
         if let Some(p) = cmd.find('=') {
             let mut x = &cmd[..p];
             let is_bool = if x.ends_with("?") {
