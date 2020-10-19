@@ -27,6 +27,7 @@ pub fn run_dockerignore_creator(
     } else {
         Box::new(std::io::stdout())
     };
+    output.write("*\n".as_ref())?;
     for i in x.iter() {
         output.write(format!("!{}/**\n", i.dir).as_ref())?;
     }
