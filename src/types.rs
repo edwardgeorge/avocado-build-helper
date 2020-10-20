@@ -11,8 +11,8 @@ use thiserror::Error;
 pub enum DepError {
     #[error("Component spec issue: Missing transitive dependencies: {0:?}")]
     MissingDepError(Vec<String>),
-    #[error("Component spec issue: Cycle found or unfound dependencies: {0:?}")]
-    CycleError(Vec<String>),
+    #[error("Component spec issue: Cycle found with or unfound dependencies for:\n {0}")]
+    CycleError(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,7 +84,7 @@ pub fn transitive_dependencies(
         }
     }
     if !needed.is_empty() {
-        return Err(DepError::MissingDepError(needed.drain().collect()))
+        return Err(DepError::MissingDepError(needed.drain().collect()));
     }
     Ok(result)
 }
@@ -126,8 +126,19 @@ where
             }
         }
         if !active {
-            let keys: Vec<String> = non.iter().map(|(_, k, _)| format!("{:?}", k)).collect();
-            return Err(DepError::CycleError(keys));
+            let keys: Vec<String> = non
+                .iter()
+                .map(|(_, k, d)| {
+                    let unfound = d
+                        .iter()
+                        .filter(|k| !seen.contains(k))
+                        .map(|k| format!("{:?}", k))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    format!("{:?} (unsatisfied deps: {})", k, unfound)
+                })
+                .collect();
+            return Err(DepError::CycleError(keys.join(",\n ")));
         }
         std::mem::swap(&mut rem, &mut non);
     }
