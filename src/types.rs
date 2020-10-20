@@ -5,6 +5,15 @@ use std::fs::File;
 use std::hash::Hash;
 use std::path::Path;
 use std::vec::Vec;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum DepError {
+    #[error("Component spec issue: Missing transitive dependencies: {0:?}")]
+    MissingDepError(Vec<String>),
+    #[error("Component spec issue: Cycle found or unfound dependencies: {0:?}")]
+    CycleError(Vec<String>),
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Component {
@@ -41,7 +50,7 @@ pub fn load_components(path: &Path) -> Vec<Component> {
     from_reader(f).unwrap()
 }
 
-pub fn toposort_components(inp: Vec<Component>) -> Vec<Component> {
+pub fn toposort_components(inp: Vec<Component>) -> Result<Vec<Component>, DepError> {
     toposort(inp, |a| a.dir.to_owned(), |a| a.depset())
 }
 
@@ -49,8 +58,8 @@ pub fn transitive_dependencies(
     inp: Vec<Component>,
     dir: String,
     include_self: bool,
-) -> Vec<Component> {
-    let mut deps = toposort_components(inp);
+) -> Result<Vec<Component>, DepError> {
+    let mut deps = toposort_components(inp)?;
     deps.reverse();
     let mut needed: HashSet<String> = HashSet::new();
     let mut result = Vec::<Component>::new();
@@ -71,19 +80,16 @@ pub fn transitive_dependencies(
         }
         if needed.is_empty() {
             // no more dependencies needed; short-circuit
-            return result;
+            return Ok(result);
         }
     }
     if !needed.is_empty() {
-        panic!(
-            "Not all transitive dependencies in components: {:?} missing",
-            needed
-        );
+        return Err(DepError::MissingDepError(needed.drain().collect()))
     }
-    result
+    Ok(result)
 }
 
-fn toposort<A, K, F, G>(inp: Vec<A>, key: F, fdep: G) -> Vec<A>
+fn toposort<A, K, F, G>(inp: Vec<A>, key: F, fdep: G) -> Result<Vec<A>, DepError>
 where
     K: Eq + Hash + std::fmt::Debug,
     F: Fn(&A) -> K,
@@ -107,7 +113,7 @@ where
     let mut non = Vec::new();
     loop {
         if rem.is_empty() {
-            return res;
+            return Ok(res);
         }
         let mut active = false;
         for (v, k, deps) in rem.drain(..) {
@@ -120,8 +126,8 @@ where
             }
         }
         if !active {
-            let keys: Vec<_> = non.iter().map(|(_, k, _)| k).collect();
-            panic!("Cycle found in deps! participants: {:?}", keys);
+            let keys: Vec<String> = non.iter().map(|(_, k, _)| format!("{:?}", k)).collect();
+            return Err(DepError::CycleError(keys));
         }
         std::mem::swap(&mut rem, &mut non);
     }

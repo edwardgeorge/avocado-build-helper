@@ -22,7 +22,7 @@ where
     F: Fn(&mut Component) -> anyhow::Result<()>,
 {
     let mut x = load_components(path);
-    x = toposort_components(x);
+    x = toposort_components(x)?;
     let mut n: HashMap<String, (i32, [u8; 32])> = HashMap::new();
     let x: Result<Vec<_>> = x
         .iter_mut()
