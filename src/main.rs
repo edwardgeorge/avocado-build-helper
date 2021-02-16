@@ -8,6 +8,7 @@ mod types;
 use dockerignore::*;
 use executor::{annotate_component, CommandRegistry};
 use hasher::*;
+use types::CustomError;
 
 fn main() -> Result<(), anyhow::Error> {
     env_logger::init();
@@ -116,7 +117,7 @@ fn register_added_props<'a, A: Iterator<Item = T>, T: AsRef<str>>(
     reg: &mut CommandRegistry,
     props: A,
     is_shell: bool,
-) -> anyhow::Result<()> {
+) -> Result<(), CustomError> {
     for cmd_ref in props {
         let cmd = cmd_ref.as_ref();
         if let Some(p) = cmd.find('=') {
@@ -130,7 +131,7 @@ fn register_added_props<'a, A: Iterator<Item = T>, T: AsRef<str>>(
             let y = &cmd[p + 1..];
             reg.add_command(x, y, is_shell, is_bool)?;
         } else {
-            panic!("Invalid argument format {:?}, requires an '='", cmd);
+            return Err(CustomError::PropMissingEqualsError { argument: cmd.to_owned() });
         }
     }
     Ok(())

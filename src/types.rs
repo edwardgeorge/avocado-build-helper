@@ -8,11 +8,37 @@ use std::vec::Vec;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum DepError {
+pub enum CustomError {
     #[error("Component spec issue: Missing transitive dependencies: {0:?}")]
     MissingDepError(Vec<String>),
     #[error("Component spec issue: Cycle found with or unfound dependencies for:\n {0}")]
     CycleError(String),
+    #[error("Duplicate property name: {name}")]
+    DuplicatePropertyNameError { name: String },
+    #[error("Error in template for property {prop_name}:\n{error}")]
+    TemplateError {
+        prop_name: String,
+        error: handlebars::TemplateError,
+    },
+    #[error("Invalid argument format {argument}, requires an '='")]
+    PropMissingEqualsError { argument: String },
+    #[error("Command {cmd:?} was not successful: {reason}")]
+    UnsuccessfulCommandError { cmd: String, reason: String },
+    #[error("Error parsing command {cmd:?}:\n{error}")]
+    CommandParseError {
+        cmd: String,
+        error: shell_words::ParseError,
+    },
+    #[error("Error rendering template for {cmd_name}:\n{error}")]
+    TemplateRenderError {
+        cmd_name: String,
+        error: handlebars::RenderError,
+    },
+    #[error("Error attempting to execute command for {cmd_name}:\n{error}")]
+    CommandExecutionError {
+        cmd_name: String,
+        error: std::io::Error,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,7 +76,7 @@ pub fn load_components(path: &Path) -> Vec<Component> {
     from_reader(f).unwrap()
 }
 
-pub fn toposort_components(inp: Vec<Component>) -> Result<Vec<Component>, DepError> {
+pub fn toposort_components(inp: Vec<Component>) -> Result<Vec<Component>, CustomError> {
     toposort(inp, |a| a.dir.to_owned(), |a| a.depset())
 }
 
@@ -58,7 +84,7 @@ pub fn transitive_dependencies(
     inp: Vec<Component>,
     dir: String,
     include_self: bool,
-) -> Result<Vec<Component>, DepError> {
+) -> Result<Vec<Component>, CustomError> {
     let mut deps = toposort_components(inp)?;
     deps.reverse();
     let mut needed: HashSet<String> = HashSet::new();
@@ -84,12 +110,12 @@ pub fn transitive_dependencies(
         }
     }
     if !needed.is_empty() {
-        return Err(DepError::MissingDepError(needed.drain().collect()));
+        return Err(CustomError::MissingDepError(needed.drain().collect()));
     }
     Ok(result)
 }
 
-fn toposort<A, K, F, G>(inp: Vec<A>, key: F, fdep: G) -> Result<Vec<A>, DepError>
+fn toposort<A, K, F, G>(inp: Vec<A>, key: F, fdep: G) -> Result<Vec<A>, CustomError>
 where
     K: Eq + Hash + std::fmt::Debug,
     F: Fn(&A) -> K,
@@ -138,7 +164,7 @@ where
                     format!("{:?} (unsatisfied deps: {})", k, unfound)
                 })
                 .collect();
-            return Err(DepError::CycleError(keys.join(",\n ")));
+            return Err(CustomError::CycleError(keys.join(",\n ")));
         }
         std::mem::swap(&mut rem, &mut non);
     }

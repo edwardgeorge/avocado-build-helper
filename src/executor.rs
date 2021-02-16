@@ -6,14 +6,7 @@ use std::collections::HashMap;
 use std::process::{Command, Stdio};
 use std::vec::Vec;
 
-use crate::types::Component;
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-#[error("Duplicate property name: {}", self.name)]
-pub struct DuplicatePropertyNameError {
-    name: String,
-}
+use crate::types::{Component, CustomError};
 
 #[derive(Debug)]
 struct CommandConfig {
@@ -33,8 +26,11 @@ fn new_shell_command(cmd: &str) -> Command {
     com
 }
 
-fn new_command(cmd: &str) -> anyhow::Result<Command> {
-    let args = split(&cmd)?;
+fn new_command(cmd: &str) -> Result<Command, CustomError> {
+    let args = split(&cmd).map_err(|e| CustomError::CommandParseError {
+        cmd: cmd.to_owned(),
+        error: e,
+    })?;
     let mut com = Command::new(&args[0]);
     com.args(&args[1..]);
     Ok(com)
@@ -56,10 +52,10 @@ impl<'a> CommandRegistry<'a> {
         command: &str,
         is_shell_command: bool,
         is_bool_result: bool,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), CustomError> {
         if self.is_shell_map.contains_key(name) {
-            anyhow::bail!(DuplicatePropertyNameError {
-                name: name.to_owned()
+            return Err(CustomError::DuplicatePropertyNameError {
+                name: name.to_owned(),
             });
         }
         self.commands.push(name.to_owned());
@@ -68,7 +64,12 @@ impl<'a> CommandRegistry<'a> {
             is_bool: is_bool_result,
         };
         self.is_shell_map.insert(name.to_owned(), config);
-        Ok(self.handlebars.register_template_string(name, command)?)
+        self.handlebars
+            .register_template_string(name, command)
+            .map_err(|e| CustomError::TemplateError {
+                prop_name: name.to_owned(),
+                error: e,
+            })
     }
 
     pub fn run_command(
@@ -78,7 +79,13 @@ impl<'a> CommandRegistry<'a> {
         is_shell_command: bool,
         is_bool_result: bool,
     ) -> anyhow::Result<String> {
-        let cmd = self.handlebars.render(name, data)?;
+        let cmd =
+            self.handlebars
+                .render(name, data)
+                .map_err(|e| CustomError::TemplateRenderError {
+                    cmd_name: name.to_owned(),
+                    error: e,
+                })?;
         let mut com = if is_shell_command {
             new_shell_command(&cmd)
         } else {
@@ -87,7 +94,11 @@ impl<'a> CommandRegistry<'a> {
         let out = com
             .envs(component_to_envs("AVOCADO_", data)?)
             .stderr(Stdio::inherit())
-            .output()?;
+            .output()
+            .map_err(|e| CustomError::CommandExecutionError {
+                cmd_name: name.to_owned(),
+                error: e,
+            })?;
         if is_bool_result {
             return Ok(match out.status.success() {
                 true => "true",
@@ -96,13 +107,16 @@ impl<'a> CommandRegistry<'a> {
             .to_owned());
         }
         if !out.status.success() {
-            panic!(
-                "Command {:?} was not successful: {:?}",
-                cmd,
-                out.status.code()
-            );
+            anyhow::bail!(CustomError::UnsuccessfulCommandError {
+                cmd: cmd.to_owned(),
+                reason: match out.status.code() {
+                    Some(c) => format!("exit code {}", c),
+                    None => format!("terminated by signal"),
+                },
+            })
+        } else {
+            Ok(std::str::from_utf8(&out.stdout)?.trim().to_owned())
         }
-        Ok(std::str::from_utf8(&out.stdout)?.trim().to_owned())
     }
 
     pub fn run_all(&self, data: &Component) -> anyhow::Result<Vec<(String, String)>> {
