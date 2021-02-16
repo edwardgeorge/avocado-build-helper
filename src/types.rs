@@ -11,6 +11,8 @@ use thiserror::Error;
 pub enum CustomError {
     #[error("Component spec issue: Missing transitive dependencies: {0:?}")]
     MissingDepError(Vec<String>),
+    #[error("Component spec issue: Missing component named: {0}")]
+    MissingComponentError(String),
     #[error("Component spec issue: Cycle found with or unfound dependencies for:\n {0}")]
     CycleError(String),
     #[error("Duplicate property name: {name}")]
@@ -111,6 +113,31 @@ pub fn transitive_dependencies(
     }
     if !needed.is_empty() {
         return Err(CustomError::MissingDepError(needed.drain().collect()));
+    }
+    Ok(result)
+}
+
+pub fn transitive_dependents(
+    inp: Vec<Component>,
+    dir: String,
+    include_self: bool,
+) -> Result<Vec<Component>, CustomError> {
+    let mut deps = toposort_components(inp)?;
+    let mut needed: HashSet<String> = HashSet::new();
+    let mut result = Vec::<Component>::new();
+    for item in deps.drain(..) {
+        if item.dir == dir {
+            needed.insert(dir.clone());
+            if include_self {
+                result.push(item);
+            }
+        } else if !item.depset().is_disjoint(&needed) {
+            needed.insert(item.dir.clone());
+            result.push(item);
+        }
+    }
+    if needed.is_empty() {
+        return Err(CustomError::MissingComponentError(dir));
     }
     Ok(result)
 }

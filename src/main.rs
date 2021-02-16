@@ -83,7 +83,7 @@ fn main() -> Result<(), anyhow::Error> {
                 .arg(Arg::with_name("component").required(true).index(1)),
         )
         .subcommand(
-            SubCommand::with_name("topo")
+            SubCommand::with_name("toposort")
                 .about("Topologically sort components")
                 .arg(
                     Arg::with_name("directory")
@@ -91,6 +91,40 @@ fn main() -> Result<(), anyhow::Error> {
                         .index(1)
                         .default_value("."),
                 ),
+        )
+        .subcommand(
+            SubCommand::with_name("transitive-dependencies")
+                .about("List all transitive dependencies of component (topologically sorted)")
+                .arg(
+                    Arg::with_name("directory")
+                        .short("d")
+                        .required(false)
+                        .default_value("."),
+                )
+                .arg(
+                    Arg::with_name("no-include-self")
+                        .short("n")
+                        .required(false)
+                        .takes_value(false),
+                )
+                .arg(Arg::with_name("component").required(true).index(1)),
+        )
+        .subcommand(
+            SubCommand::with_name("transitive-dependents")
+                .about("List all transitive dependents of component (topologically sorted)")
+                .arg(
+                    Arg::with_name("directory")
+                        .short("d")
+                        .required(false)
+                        .default_value("."),
+                )
+                .arg(
+                    Arg::with_name("no-include-self")
+                        .short("n")
+                        .required(false)
+                        .takes_value(false),
+                )
+                .arg(Arg::with_name("component").required(true).index(1)),
         )
         .get_matches();
     if let Some(m) = matches.subcommand_matches("hash-components") {
@@ -118,10 +152,35 @@ fn main() -> Result<(), anyhow::Error> {
         let overwrite = m.is_present("overwrite");
         let noinclude = m.is_present("no-include-ignore");
         run_dockerignore_creator(&path, d, overwrite, noinclude)
-    } else if let Some(m) = matches.subcommand_matches("topo") {
+    } else if let Some(m) = matches.subcommand_matches("toposort") {
         let p: &Path = m.value_of_os("directory").unwrap().as_ref();
         let path = p.canonicalize()?;
         run_topo(&path)
+    } else if let Some(m) = matches.subcommand_matches("transitive-dependencies") {
+        let p: &Path = m.value_of_os("directory").unwrap().as_ref();
+        let path = p.canonicalize()?;
+        let d = m.value_of("component").unwrap();
+        let noinclude = m.is_present("no-include-self");
+        let r = types::transitive_dependencies(
+            types::load_components(&path),
+            d.to_owned(),
+            !noinclude,
+        )?;
+        for component in r.iter() {
+            println!("{}", component.dir);
+        }
+        Ok(())
+    } else if let Some(m) = matches.subcommand_matches("transitive-dependents") {
+        let p: &Path = m.value_of_os("directory").unwrap().as_ref();
+        let path = p.canonicalize()?;
+        let d = m.value_of("component").unwrap();
+        let noinclude = m.is_present("no-include-self");
+        let r =
+            types::transitive_dependents(types::load_components(&path), d.to_owned(), !noinclude)?;
+        for component in r.iter() {
+            println!("{}", component.dir);
+        }
+        Ok(())
     } else {
         panic!("unexpected subcommand")
     }
