@@ -10,6 +10,11 @@ use executor::{annotate_component, CommandRegistry};
 use hasher::*;
 use types::CustomError;
 
+enum Deps {
+    Dependencies,
+    Dependents,
+}
+
 fn main() -> Result<(), anyhow::Error> {
     env_logger::init();
     let matches = App::new("Build Helper")
@@ -161,26 +166,13 @@ fn main() -> Result<(), anyhow::Error> {
         let path = p.canonicalize()?;
         let d = m.value_of("component").unwrap();
         let noinclude = m.is_present("no-include-self");
-        let r = types::transitive_dependencies(
-            types::load_components(&path),
-            d.to_owned(),
-            !noinclude,
-        )?;
-        for component in r.iter() {
-            println!("{}", component.dir);
-        }
-        Ok(())
+        run_listdeps(&path, Deps::Dependencies, !noinclude, d)
     } else if let Some(m) = matches.subcommand_matches("transitive-dependents") {
         let p: &Path = m.value_of_os("directory").unwrap().as_ref();
         let path = p.canonicalize()?;
         let d = m.value_of("component").unwrap();
         let noinclude = m.is_present("no-include-self");
-        let r =
-            types::transitive_dependents(types::load_components(&path), d.to_owned(), !noinclude)?;
-        for component in r.iter() {
-            println!("{}", component.dir);
-        }
-        Ok(())
+        run_listdeps(&path, Deps::Dependents, !noinclude, d)
     } else {
         panic!("unexpected subcommand")
     }
@@ -215,6 +207,27 @@ fn register_added_props<'a, A: Iterator<Item = T>, T: AsRef<str>>(
 fn run_topo(path: &Path) -> anyhow::Result<()> {
     let x = types::load_components(path);
     for component in types::toposort_components(x)?.iter() {
+        println!("{}", component.dir);
+    }
+    Ok(())
+}
+
+fn run_listdeps(
+    path: &Path,
+    deps: Deps,
+    include_self: bool,
+    component: &str,
+) -> anyhow::Result<()> {
+    let func = match deps {
+        Deps::Dependencies => types::transitive_dependencies,
+        Deps::Dependents => types::transitive_dependents,
+    };
+    let r = func(
+        types::load_components(&path),
+        component.to_owned(),
+        include_self,
+    )?;
+    for component in r.iter() {
         println!("{}", component.dir);
     }
     Ok(())
