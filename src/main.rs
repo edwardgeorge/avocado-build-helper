@@ -82,6 +82,16 @@ fn main() -> Result<(), anyhow::Error> {
                 )
                 .arg(Arg::with_name("component").required(true).index(1)),
         )
+        .subcommand(
+            SubCommand::with_name("topo")
+                .about("Topologically sort components")
+                .arg(
+                    Arg::with_name("directory")
+                        .required(false)
+                        .index(1)
+                        .default_value("."),
+                ),
+        )
         .get_matches();
     if let Some(m) = matches.subcommand_matches("hash-components") {
         let mut reg = CommandRegistry::new();
@@ -108,6 +118,10 @@ fn main() -> Result<(), anyhow::Error> {
         let overwrite = m.is_present("overwrite");
         let noinclude = m.is_present("no-include-ignore");
         run_dockerignore_creator(&path, d, overwrite, noinclude)
+    } else if let Some(m) = matches.subcommand_matches("topo") {
+        let p: &Path = m.value_of_os("directory").unwrap().as_ref();
+        let path = p.canonicalize()?;
+        run_topo(&path)
     } else {
         panic!("unexpected subcommand")
     }
@@ -131,8 +145,18 @@ fn register_added_props<'a, A: Iterator<Item = T>, T: AsRef<str>>(
             let y = &cmd[p + 1..];
             reg.add_command(x, y, is_shell, is_bool)?;
         } else {
-            return Err(CustomError::PropMissingEqualsError { argument: cmd.to_owned() });
+            return Err(CustomError::PropMissingEqualsError {
+                argument: cmd.to_owned(),
+            });
         }
+    }
+    Ok(())
+}
+
+fn run_topo(path: &Path) -> anyhow::Result<()> {
+    let x = types::load_components(path);
+    for component in types::toposort_components(x)?.iter() {
+        println!("{}", component.dir);
     }
     Ok(())
 }
