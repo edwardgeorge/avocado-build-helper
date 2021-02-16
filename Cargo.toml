@@ -1,6 +1,6 @@
 [package]
 name = "avocado-build-helper"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Edward George <edward.george@maersk.com>"]
 edition = "2018"
 
