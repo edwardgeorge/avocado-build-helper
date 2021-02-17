@@ -112,7 +112,12 @@ fn main() -> Result<(), anyhow::Error> {
                         .required(false)
                         .takes_value(false),
                 )
-                .arg(Arg::with_name("component").required(true).index(1)),
+                .arg(
+                    Arg::with_name("component")
+                        .required(true)
+                        .index(1)
+                        .multiple(true),
+                ),
         )
         .subcommand(
             SubCommand::with_name("transitive-dependents")
@@ -129,7 +134,12 @@ fn main() -> Result<(), anyhow::Error> {
                         .required(false)
                         .takes_value(false),
                 )
-                .arg(Arg::with_name("component").required(true).index(1)),
+                .arg(
+                    Arg::with_name("component")
+                        .required(true)
+                        .index(1)
+                        .multiple(true),
+                ),
         )
         .get_matches();
     if let Some(m) = matches.subcommand_matches("hash-components") {
@@ -164,15 +174,15 @@ fn main() -> Result<(), anyhow::Error> {
     } else if let Some(m) = matches.subcommand_matches("transitive-dependencies") {
         let p: &Path = m.value_of_os("directory").unwrap().as_ref();
         let path = p.canonicalize()?;
-        let d = m.value_of("component").unwrap();
+        let components: Vec<_> = m.values_of("component").unwrap().collect();
         let noinclude = m.is_present("no-include-self");
-        run_listdeps(&path, Deps::Dependencies, !noinclude, d)
+        run_listdeps(&path, Deps::Dependencies, !noinclude, components)
     } else if let Some(m) = matches.subcommand_matches("transitive-dependents") {
         let p: &Path = m.value_of_os("directory").unwrap().as_ref();
         let path = p.canonicalize()?;
-        let d = m.value_of("component").unwrap();
+        let components: Vec<_> = m.values_of("component").unwrap().collect();
         let noinclude = m.is_present("no-include-self");
-        run_listdeps(&path, Deps::Dependents, !noinclude, d)
+        run_listdeps(&path, Deps::Dependents, !noinclude, components)
     } else {
         panic!("unexpected subcommand")
     }
@@ -216,17 +226,13 @@ fn run_listdeps(
     path: &Path,
     deps: Deps,
     include_self: bool,
-    component: &str,
+    components: Vec<&str>,
 ) -> anyhow::Result<()> {
     let func = match deps {
         Deps::Dependencies => types::transitive_dependencies,
         Deps::Dependents => types::transitive_dependents,
     };
-    let r = func(
-        types::load_components(&path),
-        component.to_owned(),
-        include_self,
-    )?;
+    let r = func(types::load_components(&path), &components[..], include_self)?;
     for component in r.iter() {
         println!("{}", component.dir);
     }

@@ -11,8 +11,8 @@ use thiserror::Error;
 pub enum CustomError {
     #[error("Component spec issue: Missing transitive dependencies: {0:?}")]
     MissingDepError(Vec<String>),
-    #[error("Component spec issue: Missing component named: {0}")]
-    MissingComponentError(String),
+    #[error("Component spec issue: Missing components named: {0:?}")]
+    MissingComponentError(Vec<String>),
     #[error("Component spec issue: Cycle found with or unfound dependencies for:\n {0}")]
     CycleError(String),
     #[error("Duplicate property name: {name}")]
@@ -84,25 +84,26 @@ pub fn toposort_components(inp: Vec<Component>) -> Result<Vec<Component>, Custom
 
 pub fn transitive_dependencies(
     inp: Vec<Component>,
-    dir: String,
-    include_self: bool,
+    dirs: &[&str],
+    include_roots: bool,
 ) -> Result<Vec<Component>, CustomError> {
     let mut deps = toposort_components(inp)?;
     deps.reverse();
-    let mut needed: HashSet<String> = HashSet::new();
+    let mut needed: HashSet<String> = dirs.iter().map(|x| (*x).to_owned()).collect();
+    let mut seen: HashSet<String> = HashSet::new();
     let mut result = Vec::<Component>::new();
-    needed.insert(dir.clone());
     for item in deps.drain(..) {
         log::debug!(
             "Searching for transitive deps at '{}', needed: {:?}",
             item.dir,
             needed
         );
-        if needed.contains(&item.dir) {
-            needed.remove(&item.dir);
-            let is_self = &item.dir == &dir;
-            needed.extend(item.depset());
-            if !is_self || include_self {
+        if needed.remove(&item.dir) {
+            let deps = item.depset();
+            let is_root = !seen.contains(&item.dir[..]);
+            seen.extend(deps.iter().map(|x| x.clone()));
+            needed.extend(deps);
+            if !is_root || include_roots {
                 result.push(item);
             }
         }
@@ -119,25 +120,28 @@ pub fn transitive_dependencies(
 
 pub fn transitive_dependents(
     inp: Vec<Component>,
-    dir: String,
-    include_self: bool,
+    dirs: &[&str],
+    include_roots: bool,
 ) -> Result<Vec<Component>, CustomError> {
+    let mut roots: HashSet<&str> = dirs.into_iter().map(|x| *x).collect();
     let mut deps = toposort_components(inp)?;
-    let mut needed: HashSet<String> = HashSet::new();
+    //let mut seen: HashSet<&str> = HashSet::new();
+    let mut seen: HashSet<String> = dirs.into_iter().map(|x| (*x).to_owned()).collect();
     let mut result = Vec::<Component>::new();
     for item in deps.drain(..) {
-        if item.dir == dir {
-            needed.insert(dir.clone());
-            if include_self {
-                result.push(item);
-            }
-        } else if !item.depset().is_disjoint(&needed) {
-            needed.insert(item.dir.clone());
+        roots.remove(&item.dir[..]);
+        if !item.depset().is_disjoint(&seen) {
+            seen.insert(item.dir.clone());
+            result.push(item);
+        } else if seen.contains(&item.dir) && include_roots {
+            // if our deps aren't in seen, but we are, then we're a root
             result.push(item);
         }
     }
-    if needed.is_empty() {
-        return Err(CustomError::MissingComponentError(dir));
+    if !roots.is_empty() {
+        return Err(CustomError::MissingComponentError(
+            roots.drain().map(str::to_owned).collect(),
+        ));
     }
     Ok(result)
 }
