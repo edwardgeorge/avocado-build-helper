@@ -17,7 +17,9 @@ enum Deps {
 
 fn main() -> Result<(), anyhow::Error> {
     env_logger::init();
+    let version = env!("CARGO_PKG_VERSION");
     let matches = App::new("Build Helper")
+        .version(version)
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("hash-components")
