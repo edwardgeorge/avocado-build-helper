@@ -86,6 +86,7 @@ pub fn transitive_dependencies(
     inp: Vec<Component>,
     dirs: &[&str],
     include_roots: bool,
+    reverse_order: bool,
 ) -> Result<Vec<Component>, CustomError> {
     let mut deps = toposort_components(inp)?;
     deps.reverse();
@@ -109,13 +110,18 @@ pub fn transitive_dependencies(
         }
         if needed.is_empty() {
             // no more dependencies needed; short-circuit
-            return Ok(result);
+            break;
         }
     }
     if !needed.is_empty() {
         return Err(CustomError::MissingDepError(needed.drain().collect()));
     }
-    Ok(result)
+    if reverse_order {
+        Ok(result)
+    } else {
+        result.reverse();
+        Ok(result)
+    }
 }
 
 pub fn transitive_dependents(

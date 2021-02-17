@@ -113,6 +113,12 @@ fn main() -> Result<(), anyhow::Error> {
                         .takes_value(false),
                 )
                 .arg(
+                    Arg::with_name("reverse-topological-order")
+                        .short("r")
+                        .required(false)
+                        .takes_value(false),
+                )
+                .arg(
                     Arg::with_name("component")
                         .required(true)
                         .index(1)
@@ -176,13 +182,20 @@ fn main() -> Result<(), anyhow::Error> {
         let path = p.canonicalize()?;
         let components: Vec<_> = m.values_of("component").unwrap().collect();
         let noinclude = m.is_present("no-include-self");
-        run_listdeps(&path, Deps::Dependencies, !noinclude, components)
+        let reverse = m.is_present("reverse-topological-order");
+        run_listdeps(
+            &path,
+            Deps::Dependencies,
+            !noinclude,
+            Some(reverse),
+            components,
+        )
     } else if let Some(m) = matches.subcommand_matches("transitive-dependents") {
         let p: &Path = m.value_of_os("directory").unwrap().as_ref();
         let path = p.canonicalize()?;
         let components: Vec<_> = m.values_of("component").unwrap().collect();
         let noinclude = m.is_present("no-include-self");
-        run_listdeps(&path, Deps::Dependents, !noinclude, components)
+        run_listdeps(&path, Deps::Dependents, !noinclude, None, components)
     } else {
         panic!("unexpected subcommand")
     }
@@ -226,13 +239,19 @@ fn run_listdeps(
     path: &Path,
     deps: Deps,
     include_self: bool,
+    reverse_order: Option<bool>,
     components: Vec<&str>,
 ) -> anyhow::Result<()> {
-    let func = match deps {
-        Deps::Dependencies => types::transitive_dependencies,
-        Deps::Dependents => types::transitive_dependents,
+    let data = types::load_components(&path);
+    let r = match deps {
+        Deps::Dependencies => types::transitive_dependencies(
+            data,
+            &components[..],
+            include_self,
+            reverse_order.unwrap_or(false),
+        )?,
+        Deps::Dependents => types::transitive_dependents(data, &components[..], include_self)?,
     };
-    let r = func(types::load_components(&path), &components[..], include_self)?;
     for component in r.iter() {
         println!("{}", component.dir);
     }
