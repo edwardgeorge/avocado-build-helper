@@ -32,12 +32,12 @@ pub fn run_dockerignore_creator(
     } else {
         Box::new(std::io::stdout())
     };
-    output.write("*\n".as_ref())?;
+    output.write_all("*\n".as_ref())?;
     for i in x.iter() {
-        output.write(format!("!{}/**\n", i.dir).as_ref())?;
+        output.write_all(format!("!{}/**\n", i.dir).as_ref())?;
     }
     if let Some(d) = contents {
-        output.write(d.as_ref())?;
+        output.write_all(d.as_ref())?;
     }
     Ok(())
 }

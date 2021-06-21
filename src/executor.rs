@@ -161,10 +161,10 @@ impl<'a> CommandRegistry<'a> {
         }
         if !out.status.success() {
             anyhow::bail!(CustomError::UnsuccessfulCommandError {
-                cmd: cmd.to_owned(),
+                cmd,
                 reason: match out.status.code() {
                     Some(c) => format!("exit code {}", c),
-                    None => format!("terminated by signal"),
+                    None => "terminated by signal".to_string(),
                 },
             })
         } else {

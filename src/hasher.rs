@@ -87,7 +87,7 @@ fn hash_for_dir(git_dir: &Path, path: &Path) -> Result<String> {
 
 fn hash_for_node<S, T>(
     node_hash: &str,
-    deps: &Vec<S>,
+    deps: &[S],
     hashes: &HashMap<T, (i32, [u8; 32])>,
 ) -> (i32, [u8; 32])
 where
@@ -121,7 +121,7 @@ where
     )
 }
 
-fn build_hash<S, T>(deps: &Vec<S>, hashes: &HashMap<T, (i32, [u8; 32])>) -> (i32, Vec<u8>)
+fn build_hash<S, T>(deps: &[S], hashes: &HashMap<T, (i32, [u8; 32])>) -> (i32, Vec<u8>)
 where
     S: Borrow<T> + std::fmt::Display,
     T: Hash + Eq,
@@ -147,7 +147,7 @@ where
     (d1, r)
 }
 
-fn translate<'a, S, T, V>(inp: &Vec<S>, map: &'a HashMap<T, V>) -> Vec<&'a V>
+fn translate<'a, S, T, V>(inp: &[S], map: &'a HashMap<T, V>) -> Vec<&'a V>
 where
     S: Borrow<T>,
     T: Hash + Eq,

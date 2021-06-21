@@ -214,7 +214,7 @@ fn main() -> Result<(), anyhow::Error> {
     }
 }
 
-fn register_added_props<'a, A: Iterator<Item = T>, T: AsRef<str>>(
+fn register_added_props<A: Iterator<Item = T>, T: AsRef<str>>(
     reg: &mut CommandRegistry,
     props: A,
     config: CommandConfig,
@@ -224,11 +224,11 @@ fn register_added_props<'a, A: Iterator<Item = T>, T: AsRef<str>>(
         if let Some(p) = cmd.find('=') {
             let mut x = &cmd[..p];
             let is_command = config.is_command();
-            let conf = if is_command && x.ends_with("?") {
+            let conf = if is_command && x.ends_with('?') {
                 x = &x[..p - 1];
                 config.set_bool()
             } else {
-                config.clone()
+                config
             };
             let y = &cmd[p + 1..];
             reg.add_command(x, y, conf)?;

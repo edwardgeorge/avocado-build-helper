@@ -102,7 +102,7 @@ pub fn transitive_dependencies(
         if needed.remove(&item.dir) {
             let deps = item.depset();
             let is_root = !seen.contains(&item.dir[..]);
-            seen.extend(deps.iter().map(|x| x.clone()));
+            seen.extend(deps.iter().cloned());
             needed.extend(deps);
             if !is_root || include_roots {
                 result.push(item);
@@ -116,12 +116,10 @@ pub fn transitive_dependencies(
     if !needed.is_empty() {
         return Err(CustomError::MissingDepError(needed.drain().collect()));
     }
-    if reverse_order {
-        Ok(result)
-    } else {
+    if !reverse_order {
         result.reverse();
-        Ok(result)
     }
+    Ok(result)
 }
 
 pub fn transitive_dependents(
@@ -129,10 +127,10 @@ pub fn transitive_dependents(
     dirs: &[&str],
     include_roots: bool,
 ) -> Result<Vec<Component>, CustomError> {
-    let mut roots: HashSet<&str> = dirs.into_iter().map(|x| *x).collect();
+    let mut roots: HashSet<&str> = dirs.iter().copied().collect();
     let mut deps = toposort_components(inp)?;
     //let mut seen: HashSet<&str> = HashSet::new();
-    let mut seen: HashSet<String> = dirs.into_iter().map(|x| (*x).to_owned()).collect();
+    let mut seen: HashSet<String> = dirs.iter().map(|x| (*x).to_owned()).collect();
     let mut result = Vec::<Component>::new();
     for item in deps.drain(..) {
         roots.remove(&item.dir[..]);
