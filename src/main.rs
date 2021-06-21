@@ -6,7 +6,7 @@ mod executor;
 mod hasher;
 mod types;
 use dockerignore::*;
-use executor::{annotate_component, CommandRegistry};
+use executor::{annotate_component, CommandConfig, CommandRegistry};
 use hasher::*;
 use types::CustomError;
 
@@ -60,6 +60,14 @@ fn main() -> Result<(), anyhow::Error> {
                 .arg(
                     Arg::with_name("add-sh-prop")
                         .long("add-sh-prop")
+                        .required(false)
+                        .takes_value(true)
+                        .multiple(true)
+                        .number_of_values(1),
+                )
+                .arg(
+                    Arg::with_name("add-prop")
+                        .long("add-prop")
                         .required(false)
                         .takes_value(true)
                         .multiple(true)
@@ -156,10 +164,13 @@ fn main() -> Result<(), anyhow::Error> {
         let path = p.canonicalize()?;
         let short = m.is_present("short-shas");
         if let Some(cmds) = m.values_of("add-exec-prop") {
-            register_added_props(&mut reg, cmds, false)?;
+            register_added_props(&mut reg, cmds, CommandConfig::new_exec_command())?;
         }
         if let Some(cmds) = m.values_of("add-sh-prop") {
-            register_added_props(&mut reg, cmds, true)?;
+            register_added_props(&mut reg, cmds, CommandConfig::new_shell_command())?;
+        }
+        if let Some(cmds) = m.values_of("add-prop") {
+            register_added_props(&mut reg, cmds, CommandConfig::new_template())?;
         }
         run_hasher(
             &path,
@@ -206,20 +217,21 @@ fn main() -> Result<(), anyhow::Error> {
 fn register_added_props<'a, A: Iterator<Item = T>, T: AsRef<str>>(
     reg: &mut CommandRegistry,
     props: A,
-    is_shell: bool,
+    config: CommandConfig,
 ) -> Result<(), CustomError> {
     for cmd_ref in props {
         let cmd = cmd_ref.as_ref();
         if let Some(p) = cmd.find('=') {
             let mut x = &cmd[..p];
-            let is_bool = if x.ends_with("?") {
+            let is_command = config.is_command();
+            let conf = if is_command && x.ends_with("?") {
                 x = &x[..p - 1];
-                true
+                config.set_bool()
             } else {
-                false
+                config.clone()
             };
             let y = &cmd[p + 1..];
-            reg.add_command(x, y, is_shell, is_bool)?;
+            reg.add_command(x, y, conf)?;
         } else {
             return Err(CustomError::PropMissingEqualsError {
                 argument: cmd.to_owned(),

@@ -8,10 +8,70 @@ use std::vec::Vec;
 
 use crate::types::{Component, CustomError};
 
-#[derive(Debug)]
-struct CommandConfig {
-    is_shell: bool,
-    is_bool: bool,
+#[derive(Debug, Copy, Clone)]
+pub enum CommandConfig {
+    ExecCommand { is_bool: bool },
+    ShellCommand { is_bool: bool },
+    Template,
+}
+
+impl CommandConfig {
+    #[allow(dead_code)]
+    pub fn new_command(is_shell: bool, is_bool: bool) -> CommandConfig {
+        if is_shell {
+            CommandConfig::ShellCommand { is_bool }
+        } else {
+            CommandConfig::ExecCommand { is_bool }
+        }
+    }
+
+    pub fn new_shell_command() -> CommandConfig {
+        CommandConfig::ShellCommand { is_bool: false }
+    }
+
+    pub fn new_exec_command() -> CommandConfig {
+        CommandConfig::ExecCommand { is_bool: false }
+    }
+
+    pub fn new_template() -> CommandConfig {
+        CommandConfig::Template
+    }
+
+    pub fn set_bool(self) -> CommandConfig {
+        match self {
+            CommandConfig::ExecCommand { .. } => CommandConfig::ExecCommand { is_bool: true },
+            CommandConfig::ShellCommand { .. } => CommandConfig::ShellCommand { is_bool: true },
+            _ => panic!("Cannot set bool on templates"),
+        }
+    }
+
+    pub fn is_shell_command(&self) -> bool {
+        matches!(self, CommandConfig::ShellCommand { .. })
+    }
+
+    #[allow(dead_code)]
+    pub fn is_exec_command(&self) -> bool {
+        matches!(self, CommandConfig::ExecCommand { .. })
+    }
+
+    pub fn is_template(&self) -> bool {
+        matches!(self, CommandConfig::Template)
+    }
+
+    pub fn is_command(&self) -> bool {
+        matches!(
+            self,
+            CommandConfig::ExecCommand { .. } | CommandConfig::ShellCommand { .. }
+        )
+    }
+
+    pub fn is_bool_result(&self) -> bool {
+        matches!(
+            self,
+            CommandConfig::ExecCommand { is_bool: true }
+                | CommandConfig::ShellCommand { is_bool: true }
+        )
+    }
 }
 
 pub struct CommandRegistry<'a> {
@@ -50,8 +110,7 @@ impl<'a> CommandRegistry<'a> {
         &mut self,
         name: &str,
         command: &str,
-        is_shell_command: bool,
-        is_bool_result: bool,
+        config: CommandConfig,
     ) -> Result<(), CustomError> {
         if self.is_shell_map.contains_key(name) {
             return Err(CustomError::DuplicatePropertyNameError {
@@ -59,10 +118,6 @@ impl<'a> CommandRegistry<'a> {
             });
         }
         self.commands.push(name.to_owned());
-        let config = CommandConfig {
-            is_shell: is_shell_command,
-            is_bool: is_bool_result,
-        };
         self.is_shell_map.insert(name.to_owned(), config);
         self.handlebars
             .register_template_string(name, command)
@@ -72,13 +127,8 @@ impl<'a> CommandRegistry<'a> {
             })
     }
 
-    pub fn run_command(
-        &self,
-        name: &str,
-        data: &Component,
-        is_shell_command: bool,
-        is_bool_result: bool,
-    ) -> anyhow::Result<String> {
+    pub fn run_command(&self, name: &str, data: &Component) -> anyhow::Result<String> {
+        let config = self.is_shell_map.get(name).unwrap();
         let cmd =
             self.handlebars
                 .render(name, data)
@@ -86,7 +136,10 @@ impl<'a> CommandRegistry<'a> {
                     cmd_name: name.to_owned(),
                     error: e,
                 })?;
-        let mut com = if is_shell_command {
+        if config.is_template() {
+            return Ok(cmd);
+        }
+        let mut com = if config.is_shell_command() {
             new_shell_command(&cmd)
         } else {
             new_command(&cmd)?
@@ -99,7 +152,7 @@ impl<'a> CommandRegistry<'a> {
                 cmd_name: name.to_owned(),
                 error: e,
             })?;
-        if is_bool_result {
+        if config.is_bool_result() {
             return Ok(match out.status.success() {
                 true => "true",
                 false => "false",
@@ -122,11 +175,7 @@ impl<'a> CommandRegistry<'a> {
     pub fn run_all(&self, data: &Component) -> anyhow::Result<Vec<(String, String)>> {
         self.commands
             .iter()
-            .map(|c| {
-                let config = self.is_shell_map.get(c).unwrap();
-                self.run_command(c, data, config.is_shell, config.is_bool)
-                    .map(|v| (c.clone(), v))
-            })
+            .map(|c| self.run_command(c, data).map(|v| (c.clone(), v)))
             .collect()
     }
 }
